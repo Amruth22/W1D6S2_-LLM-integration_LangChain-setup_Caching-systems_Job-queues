@@ -89,8 +89,8 @@ def get_task_status(task_id: str):
 
 # This block allows running the application directly with `python main.py`
 if __name__ == "__main__":
-    host = os.getenv("HOST", "0.0.0.0")
-    port = int(os.getenv("PORT", 8080))
+    host = "0.0.0.0"
+    port = 8080
     reload = os.getenv("DEV_MODE", "false").lower() == "true"
 
     # Note: With 'memory://' broker, the worker is effectively in the same process.
