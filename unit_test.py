@@ -14,7 +14,7 @@ if not os.getenv("GEMINI_API_KEY"):
 from app.langchain_setup import _cached_chain_invoke
 
 # Backend server configuration
-BASE_URL = "http://127.0.0.1:8080"
+BASE_URL = "http://localhost:8080"
 
 
 class TestCoreRequirements:
