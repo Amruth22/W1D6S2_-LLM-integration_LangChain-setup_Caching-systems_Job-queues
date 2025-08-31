@@ -237,14 +237,12 @@ class CoreLLMIntegrationTests(unittest.TestCase):
         self.assertTrue(callable(task_func.apply_async))
         
         # Mock the LangChain response to avoid actual API calls
-        with patch.object(self.langchain_setup, 'get_cached_llm_response') as mock_llm:
+        with patch('app.langchain_setup.get_cached_llm_response') as mock_llm:
             mock_llm.return_value = self.mock_ai_response
             
             # Test task execution
             result = task_func(self.test_question)
-            # Don't assert exact match since LLM responses vary
-            self.assertIsInstance(result, str)
-            self.assertGreater(len(result), 10)  # Should get meaningful response
+            self.assertEqual(result, self.mock_ai_response)
             mock_llm.assert_called_once_with(self.test_question)
             
             # Test async task creation
@@ -317,7 +315,7 @@ class CoreLLMIntegrationTests(unittest.TestCase):
         self.assertIn("LLM API with LangChain", root_data["message"])
         
         # Test sync endpoint with mocked LLM response
-        with patch.object(self.langchain_setup, 'get_cached_llm_response') as mock_llm:
+        with patch('app.langchain_setup.get_cached_llm_response') as mock_llm:
             mock_llm.return_value = self.mock_ai_response
             
             response = self.client.post("/generate/", json={"question": self.test_question})
@@ -365,7 +363,7 @@ class CoreLLMIntegrationTests(unittest.TestCase):
             self.assertIsNone(response_data["error"])
         
         # Test error handling in sync endpoint
-        with patch.object(self.langchain_setup, 'get_cached_llm_response') as mock_llm:
+        with patch('app.langchain_setup.get_cached_llm_response') as mock_llm:
             mock_llm.side_effect = Exception("LLM API Error")
             
             response = self.client.post("/generate/", json={"question": self.test_question})
@@ -431,18 +429,16 @@ class CoreLLMIntegrationTests(unittest.TestCase):
             self.assertEqual(cache_info.currsize, 1)
         
         # Test async workflow with mocked components
-        with patch.object(self.langchain_setup, 'get_cached_llm_response') as mock_cached_llm:
+        with patch('app.langchain_setup.get_cached_llm_response') as mock_cached_llm:
             mock_cached_llm.return_value = self.mock_ml_response
             
             # Test task creation and execution
             task_result = self.tasks.generate_content_task(self.test_long_question)
-            # Don't assert exact match since LLM responses vary
-            self.assertIsInstance(task_result, str)
-            self.assertGreater(len(task_result), 10)  # Should get meaningful response
+            self.assertEqual(task_result, self.mock_ml_response)
             mock_cached_llm.assert_called_once_with(self.test_long_question)
         
         # Test error handling in workflow
-        with patch.object(self.langchain_setup, 'basic_chain') as mock_chain:
+        with patch('app.langchain_setup.basic_chain') as mock_chain:
             mock_chain.invoke.side_effect = Exception("API Rate Limit Exceeded")
             
             # Clear cache to ensure we hit the error
