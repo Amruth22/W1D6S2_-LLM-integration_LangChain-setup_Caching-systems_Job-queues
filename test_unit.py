@@ -454,13 +454,14 @@ class CoreLLMIntegrationTests(unittest.TestCase):
         # This should not raise an error
         load_dotenv()
         
-        print("PASS: Configuration and environment validation")
-        print("PASS: LangChain workflow components available")
-        print("PASS: Cache functionality and management")
-        print("PASS: Async task workflow components")
-        print("PASS: Celery app and AsyncResult functionality")
-        print("PASS: Import and component integration")
-        print("PASS: End-to-end LLM workflow validated")
+        print("PASS: Configuration and environment management")
+        print("PASS: App component imports and structure")
+        print("PASS: FastAPI application configuration")
+        print("PASS: API endpoint registration and routing")
+        print("PASS: Cache and Celery configuration validation")
+        print("PASS: Task registration and structure")
+        print("PASS: Project directory structure validation")
+        print("PASS: System integration and configuration validated")
 
 def run_core_tests():
     """Run core tests and provide summary"""
