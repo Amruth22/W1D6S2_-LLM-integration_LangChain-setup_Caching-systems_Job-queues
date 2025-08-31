@@ -145,10 +145,10 @@ class CoreLLMIntegrationTests(unittest.TestCase):
             # Also mock the LLM to ensure no real API calls
             with patch.object(self.langchain_setup, 'llm') as mock_llm:
                 mock_llm.invoke.return_value = self.mock_ai_response
-            
-            # Test first call (should be a cache miss)
-            result1 = self.langchain_setup._cached_chain_invoke(self.test_question)
-            self.assertEqual(result1, self.mock_ai_response)
+                
+                # Test first call (should be a cache miss)
+                result1 = self.langchain_setup._cached_chain_invoke(self.test_question)
+                self.assertEqual(result1, self.mock_ai_response)
             
             # Check cache stats after first call
             cache_info = self.langchain_setup._cached_chain_invoke.cache_info()
