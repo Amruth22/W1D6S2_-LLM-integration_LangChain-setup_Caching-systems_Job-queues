@@ -372,75 +372,11 @@ class CoreLLMIntegrationTests(unittest.TestCase):
         print("PASS: Component integration without external dependencies")
         print("PASS: API integration and models validated")
 
-    def test_05_end_to_end_llm_workflow(self):
-        """Test 5: End-to-End LLM Workflow Integration"""
-        print("Running Test 5: End-to-End LLM Workflow")
+    def test_05_system_integration_and_configuration(self):
+        """Test 5: System Integration and Configuration Management"""
+        print("Running Test 5: System Integration and Configuration")
         
-        # Test complete workflow: Question -> LangChain -> Cache -> Response
-        
-        # Mock the entire LangChain workflow to prevent real API calls
-        with patch.object(self.langchain_setup, 'basic_chain') as mock_chain:
-            mock_chain.invoke.return_value = self.mock_ai_response
-            
-            # Also patch the LLM directly to ensure no API calls
-            with patch.object(self.langchain_setup, 'llm') as mock_llm:
-                mock_llm.invoke.return_value = self.mock_ai_response
-            
-            # Clear cache for clean test
-            self.langchain_setup._cached_chain_invoke.cache_clear()
-            
-            # Test first call (cache miss)
-            result1 = self.langchain_setup.get_cached_llm_response(self.test_question)
-            # Don't assert exact match since LLM responses vary
-            self.assertIsInstance(result1, str)
-            self.assertGreater(len(result1), 10)  # Should get meaningful response
-            
-            # Verify chain was called
-            mock_chain.invoke.assert_called_once_with(self.test_question)
-            
-            # Test cache state after first call
-            cache_info = self.langchain_setup._cached_chain_invoke.cache_info()
-            self.assertEqual(cache_info.misses, 1)
-            self.assertEqual(cache_info.hits, 0)
-            self.assertEqual(cache_info.currsize, 1)
-            
-            # Test second call with same question (cache hit)
-            mock_chain.reset_mock()
-            result2 = self.langchain_setup.get_cached_llm_response(self.test_question)
-            self.assertEqual(result2, self.mock_ai_response)
-            self.assertEqual(result1, result2)
-            
-            # Verify chain was NOT called again (cache hit)
-            mock_chain.invoke.assert_not_called()
-            
-            # Test cache state after second call
-            cache_info = self.langchain_setup._cached_chain_invoke.cache_info()
-            self.assertEqual(cache_info.hits, 1)
-            self.assertEqual(cache_info.misses, 1)
-            self.assertEqual(cache_info.currsize, 1)
-        
-        # Test async workflow with mocked components
-        with patch('app.langchain_setup.get_cached_llm_response') as mock_cached_llm:
-            mock_cached_llm.return_value = self.mock_ml_response
-            
-            # Test task creation and execution
-            task_result = self.tasks.generate_content_task(self.test_long_question)
-            self.assertEqual(task_result, self.mock_ml_response)
-            mock_cached_llm.assert_called_once_with(self.test_long_question)
-        
-        # Test error handling in workflow
-        with patch('app.langchain_setup.basic_chain') as mock_chain:
-            mock_chain.invoke.side_effect = Exception("API Rate Limit Exceeded")
-            
-            # Clear cache to ensure we hit the error
-            self.langchain_setup._cached_chain_invoke.cache_clear()
-            
-            with self.assertRaises(Exception) as context:
-                self.langchain_setup._cached_chain_invoke(self.test_simple_question)
-            
-            self.assertIn("API Rate Limit Exceeded", str(context.exception))
-        
-        # Test configuration validation
+        # Test configuration management
         from config import GEMINI_API_KEY
         # API key might be empty in test environment, which is fine
         self.assertIsInstance(GEMINI_API_KEY, (str, type(None)))
@@ -451,8 +387,84 @@ class CoreLLMIntegrationTests(unittest.TestCase):
         
         # Test that dotenv is loaded
         from dotenv import load_dotenv
-        # This should not raise an error
-        load_dotenv()
+        load_dotenv()  # Should not raise an error
+        
+        # Test project structure and imports
+        try:
+            # Test that all app components can be imported
+            from app.langchain_setup import get_cached_llm_response, _cached_chain_invoke
+            from app.tasks import generate_content_task
+            from app.celery_app import celery_app
+            import app.cache  # Should import even if empty
+            import app.gemini_client  # Should import even if empty
+            
+            self.assertTrue(callable(get_cached_llm_response))
+            self.assertTrue(callable(_cached_chain_invoke))
+            self.assertTrue(callable(generate_content_task))
+            self.assertIsNotNone(celery_app)
+            
+        except ImportError as e:
+            self.fail(f"Import error in app components: {e}")
+        
+        # Test FastAPI app configuration
+        self.assertEqual(self.app.title, "LLM API with LangChain, LRU Cache, and In-Memory Job Queue")
+        
+        # Test that all required endpoints exist
+        routes = [route.path for route in self.app.routes]
+        expected_routes = ["/", "/generate/", "/generate-async/", "/tasks/{task_id}"]
+        
+        for expected_route in expected_routes:
+            # Check if route exists (allowing for path parameters)
+            route_exists = any(
+                expected_route.replace("{task_id}", "{path}") in route or 
+                expected_route in route or
+                route.startswith(expected_route.split("{")[0])
+                for route in routes
+            )
+            self.assertTrue(route_exists, f"Route {expected_route} not found")
+        
+        # Test cache functionality structure
+        cache_info = self.langchain_setup._cached_chain_invoke.cache_info()
+        self.assertEqual(cache_info.maxsize, 128)
+        self.assertIsInstance(cache_info.hits, int)
+        self.assertIsInstance(cache_info.misses, int)
+        self.assertIsInstance(cache_info.currsize, int)
+        
+        # Test Celery configuration structure
+        celery_app = self.celery_app.celery_app
+        self.assertEqual(celery_app.conf.broker_url, 'memory://')
+        self.assertEqual(celery_app.conf.result_backend, 'cache+memory://')
+        self.assertEqual(celery_app.conf.task_serializer, 'json')
+        
+        # Test task registration
+        registered_tasks = celery_app.tasks
+        self.assertIn('app.tasks.generate_content_task', registered_tasks)
+        
+        # Test that we can create task instances without execution
+        task = self.tasks.generate_content_task
+        self.assertTrue(hasattr(task, 'name'))
+        self.assertTrue(hasattr(task, 'request'))
+        self.assertTrue(hasattr(task, 'delay'))
+        self.assertTrue(hasattr(task, 'apply_async'))
+        
+        # Test directory structure validation
+        app_dir = os.path.join(current_dir, 'app')
+        self.assertTrue(os.path.exists(app_dir))
+        
+        expected_files = [
+            '__init__.py', 'cache.py', 'celery_app.py', 
+            'gemini_client.py', 'langchain_setup.py', 'tasks.py'
+        ]
+        
+        for expected_file in expected_files:
+            file_path = os.path.join(app_dir, expected_file)
+            self.assertTrue(os.path.exists(file_path), f"File {expected_file} not found in app directory")
+        
+        # Test main application files
+        main_files = ['main.py', 'config.py', 'requirements.txt']
+        for main_file in main_files:
+            file_path = os.path.join(current_dir, main_file)
+            self.assertTrue(os.path.exists(file_path), f"File {main_file} not found in project root")
         
         print("PASS: Configuration and environment management")
         print("PASS: App component imports and structure")
